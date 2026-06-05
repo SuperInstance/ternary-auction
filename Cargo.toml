@@ -1,0 +1,6 @@
+[package]
+name = "ternary-auction"
+version = "0.1.0"
+edition = "2021"
+description = "Mechanism design for ternary {-1,0,+1} resource allocation — Vickrey auction, VCG, strategy-proof verification"
+license = "MIT"
