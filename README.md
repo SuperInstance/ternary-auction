@@ -46,6 +46,13 @@ assert!(VickreyAuction::verify_truthfulness(&bids));
 - **Market simulation** — model coarse-grained strategic decisions
 - **Fairness analysis** — verify allocation efficiency and truthfulness programmatically
 
+## See Also
+- **ternary-market** — related
+- **ternary-econ** — related
+- **ternary-signaling** — related
+- **ternary-game-theory** — related
+- **ternary-voting** — related
+
 ## Install
 
 ```bash
