@@ -1,85 +1,115 @@
-# ternary-auction
+# Ternary Auction
 
-**Ternary auction mechanisms — {-1,0,+1} bidding**
+**Ternary Auction** implements mechanism design for ternary {-1, 0, +1} resource allocation — providing Vickrey (second-price) auctions, VCG mechanisms, and strategy-proof verification for systems where agents bid with ternary-valued signals.
 
-[![ternary](https://img.shields.io/badge/ecosystem-ternary-blue)](https://github.com/orgs/SuperInstance/repositories?q=ternary)
-[![tests](https://img.shields.io/badge/tests-13-green)]()
+## Why It Matters
 
-## Overview
+Resource allocation in multi-agent systems is fundamentally an auction problem: who gets the scarce resource? Mechanism design theory provides auctions where truthful bidding is the dominant strategy — agents can't benefit from lying about their valuations. The ternary bid space {Pass (-1/0), Weak (+1 weak), Strong (+1 strong)} creates a coarse but efficient allocation mechanism suitable for fleet task assignment, where fine-grained bidding is unnecessary and ternary signaling matches the conservation framework.
 
-Ternary auction mechanisms — {-1,0,+1} bidding.
+## How It Works
 
-## Architecture
+### Vickrey (Second-Price Sealed-Bid) Auction
 
-- **`Bid`** — core data structure
-- **`AuctionResult`** — core data structure
-- **`VickreyAuction`** — core data structure
-- **`VCGMechanism`** — core data structure
-- **`TernaryResolver`** — core data structure
-- **`TernaryBid`** — state enumeration
-
-### Key Functions
-
-- `value()`
-- `from_ternary()`
-- `new()`
-- `run()`
-- `verify_truthfulness()`
-- `run()`
-- `total_welfare()`
-- `total_revenue()`
-- `resolve()`
-- `confidence()`
-- ... and 1 more
-
-## Why Ternary?
-
-The balanced ternary system {-1, 0, +1} (also known as Z₃) is the mathematically optimal discrete encoding:
-- **More expressive than binary**: three states capture positive, neutral, and negative
-- **Natural for decisions**: accept/reject/abstain, buy/hold/sell, agree/disagree/neutral
-- **Self-balancing**: the 0 state acts as a universal screen, preventing pathological lock-in
-- **Z₃ cyclic dynamics**: rock-paper-scissors is the only natural coordination mechanism
-
-## Stats
-
-| Metric | Value |
-|--------|-------|
-| Lines of Rust | 257 |
-| Test count | 13 |
-| Public types | 6 |
-| Public functions | 11 |
-
-## Ecosystem
-
-This crate is part of the **[SuperInstance Ternary Fleet](https://github.com/orgs/SuperInstance/repositories?q=ternary)**:
-
-- **[ternary-core](https://github.com/SuperInstance/ternary-core)** — shared traits and Z₃ arithmetic
-- **[ternary-grid](https://github.com/SuperInstance/ternary-grid)** — spatial grid with {-1, 0, +1} cells
-- **[ternary-graph](https://github.com/SuperInstance/ternary-graph)** — ternary-weighted graph algorithms
-- **[ternary-automata](https://github.com/SuperInstance/ternary-automata)** — three-state cellular automata
-- **[ternary-compiler](https://github.com/SuperInstance/ternary-compiler)** — expression compiler and optimizer
-
-200+ crates. 4,300+ tests. One pattern.
-
-## Research Context
-
-The ternary approach connects to several active research areas:
-- **Ternary Neural Networks** (TNNs): weights constrained to {-1, 0, +1} for efficient inference
-- **Huawei's ternary chip**: 7nm ternary silicon with 60% less power consumption
-- **Active inference**: free energy minimization naturally maps to ternary action selection
-- **Cyclic dominance**: RPS dynamics maintain biodiversity in spatial ecology
-- **Z₃ group theory**: the only algebraic group on three elements is cyclic addition mod 3
-
-## Usage
-
-```toml
-[dependencies]
-ternary-auction = "0.1.0"
 ```
+Winner = bidder with highest bid value
+Price paid = second-highest bid value
+```
+
+Implementation: sort bids descending, winner = bids[0], price = bids[1].
+
+- Sorting: **O(N log N)** for N bidders
+- Truthfulness: guaranteed by the revelation principle — truthful bidding is a dominant strategy
+
+### Ternary Bid Mapping
+
+Ternary values map to bid levels:
+
+```
+-1 → Pass (no bid)
+ 0 → Pass (no bid)
++1 → Strong bid
+```
+
+For finer granularity, `TernaryBid` provides three levels:
+
+```
+Pass = 0, Weak = 1, Strong = 2
+```
+
+### Truthfulness Verification
+
+The crate verifies the incentive-compatibility property:
+
+```
+for each agent i:
+    truthful_utility = utility(i, bid_i, result)
+    for each alternative bid b:
+        alt_utility = utility(i, b, result_with_b)
+        if alt_utility > truthful_utility + ε:
+            return false  // Lying is profitable — not truthful
+```
+
+Verification: **O(N · B)** where B = number of alternative bid values.
+
+### Social Welfare
+
+```
+social_welfare = Σ agent_utilities
+```
+
+In Vickrey auctions, the allocation is efficient: the winner is the agent with the highest true valuation, maximizing social welfare.
+
+### VCG (Vickrey-Clarke-Groves)
+
+VCG extends to combinatorial allocation:
+
+```
+payment_i = Σ_{j≠i} v_j(allocation_without_i) - Σ_{j≠i} v_j(allocation_with_i)
+```
+
+VCG is strategy-proof for combinatorial auctions where Vickrey handles single-item.
+
+## Quick Start
 
 ```rust
-use ternary_auction;
+use ternary_auction::{Bid, TernaryBid, VickreyAuction};
+
+let bids = vec![
+    Bid::new(0, TernaryBid::Strong, 100.0),
+    Bid::new(1, TernaryBid::Weak, 50.0),
+    Bid::new(2, TernaryBid::Pass, 0.0),
+];
+
+let result = VickreyAuction::run(&bids);
+assert_eq!(result.winner, Some(0)); // Highest bid wins
+assert_eq!(result.price, 1.0);      // Pays second-highest (Weak=1)
+
+// Verify truthfulness
+assert!(VickreyAuction::verify_truthfulness(&bids));
 ```
+
+## API
+
+| Type | Description |
+|------|-------------|
+| `TernaryBid` | `Pass (0)`, `Weak (1)`, `Strong (2)` |
+| `Bid` | bidder_id, value, true_value |
+| `AuctionResult` | winner, price, revenue, social_welfare, allocation_efficient |
+| `VickreyAuction` | Second-price sealed-bid auction |
+| `VickreyAuction::run(bids)` | Execute auction |
+| `VickreyAuction::verify_truthfulness(bids)` | Check incentive compatibility |
+
+## Architecture Notes
+
+Ternary Auction provides resource allocation for fleet task assignment in SuperInstance. In γ + η = C, winning an auction represents γ (growth — acquiring resources for expansion) while losing represents η (avoidance — deferring to higher-value agents). The truthfulness property ensures γ + η = C holds: no agent can game the mechanism to violate the conservation of social welfare.
+
+See [ARCHITECTURE.md](https://github.com/SuperInstance/SuperInstance/blob/main/ARCHITECTURE.md) for fleet resource allocation.
+
+## References
+
+1. Vickrey, W. (1961). "Counterspeculation, Auctions, and Competitive Sealed Tenders." *Journal of Finance*, 16(1), 8–37.
+2. Clarke, E. H. (1971). "Multipart Pricing of Public Goods." *Public Choice*, 11, 17–33.
+3. Nisan, N. et al. (2007). *Algorithmic Game Theory*. Cambridge University Press.
 
 ## License
 
